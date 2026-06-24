@@ -1,0 +1,59 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Project {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @db.VarChar(255)
+  pictureUrl       String   @default("") @map("picture_url")
+  shortDescription String   @default("") @map("short_description")
+  longDescription  String   @default("") @map("long_description")
+  dateCreate       DateTime @default(now()) @map("date_create") @db.Date
+  status           String   @default("Planned") @map("status") @db.VarChar(50)
+  otherPictures    Json     @default("[]") @map("other_pictures")
+  techStack        Json     @default("[]") @map("tech_stack")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("projects")
+}
+
+model Writing {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String   @db.VarChar(255)
+  shortDescription String   @default("") @map("short_description")
+  dateCreate       DateTime @default(now()) @map("date_create") @db.Date
+  status           String   @default("Draft") @db.VarChar(50)
+  urlFile          String   @default("") @map("url_file")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("writings")
+}
+
+model Certification {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String   @db.VarChar(255)
+  status     String   @default("Active") @db.VarChar(50)
+  pictureUrl String   @default("") @map("picture_url")
+  issuer     String   @default("") @db.VarChar(255)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  @@map("certifications")
+}
+
+model AdminUser {
+  id           String   @id @default(uuid()) @db.Uuid
+  username     String   @unique @db.VarChar(100)
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  @@map("admin_users")
+}

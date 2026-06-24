@@ -1,0 +1,106 @@
+services:
+  # --- DATABASE SECTION ---
+  postgres:
+    image: postgres:15-alpine
+    container_name: porto_dashboard_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-porto_dashboard}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-porto_dashboard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - porto_network
+
+  # --- STORAGE SECTION (SeaweedFS) ---
+  master:
+    image: chrislusf/seaweedfs
+    container_name: seaweed_master
+    restart: unless-stopped
+    command: "master -ip=master -defaultReplication=000"
+    ports:
+      - "9333:9333"
+      - "19333:19333"
+    volumes:
+      - ./data/seaweed_master:/data
+    networks:
+      - porto_network
+
+  volume:
+    image: chrislusf/seaweedfs
+    container_name: seaweed_volume
+    restart: unless-stopped
+    command: "volume -dir=/data -mserver=master:9333 -port=8080"
+    ports:
+      - "8085:8080"
+      - "18080:18080"
+    volumes:
+      - ./data/seaweed_volume:/data
+    depends_on:
+      - master
+    networks:
+      - porto_network
+
+  filer:
+    image: chrislusf/seaweedfs
+    container_name: seaweed_filer
+    restart: unless-stopped
+    command: 'filer -master="master:9333"'
+    ports:
+      - "8888:8888"
+      - "18888:18888"
+    volumes:
+      - ./data/seaweed_filer:/data
+    depends_on:
+      - master
+      - volume
+    networks:
+      - porto_network
+
+  s3:
+    image: chrislusf/seaweedfs
+    container_name: seaweed_s3
+    restart: unless-stopped
+    command: 's3 -filer="filer:8888"'
+    ports:
+      - "8333:8333"
+    depends_on:
+      - filer
+    networks:
+      - porto_network
+
+  # --- DASHBOARD SERVICE ---
+  dashboardsvc:
+    image: ramdhanistars/dashboardsvc:latest
+    container_name: porto_dashboard_svc
+    restart: unless-stopped
+    ports:
+      - "${PORT:-4000}:4000"
+    environment:
+      PORT: 4000
+      DATABASE_URL: postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-porto_dashboard}
+      JWT_SECRET: ${JWT_SECRET:-s3rv1c3_d4shb04rd_jwt_s3cr3t_k3y_2026}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:4000}
+      PUBLIC_URL: ${PUBLIC_URL:-http://localhost:4000}
+      SEAWEEDFS_FILER_URL: http://filer:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      filer:
+        condition: service_started
+    networks:
+      - porto_network
+
+networks:
+  porto_network:
+    driver: bridge

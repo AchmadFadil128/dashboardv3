@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Service Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <%- include('partials/navbar') %>
+
+  <div class="container mt-5">
+    <h2>Dashboard</h2>
+    <p>Welcome to the admin panel. Manage your portfolio data via REST API.</p>
+    
+    <div class="row mt-4">
+      <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+          <div class="card-body text-center">
+            <h5 class="card-title">Projects</h5>
+            <div id="projects-count" class="display-4">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+          <div class="card-body text-center">
+            <h5 class="card-title">Writings</h5>
+            <div id="writings-count" class="display-4">0</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card shadow-sm mb-4">
+          <div class="card-body text-center">
+            <h5 class="card-title">Certifications</h5>
+            <div id="certs-count" class="display-4">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    async function loadStats() {
+      try {
+        const [projectsRes, writingsRes, certsRes] = await Promise.all([
+          authFetch('/api/projects'),
+          authFetch('/api/writings'),
+          authFetch('/api/certifications')
+        ]);
+
+        const [projects, writings, certs] = await Promise.all([
+          projectsRes.json(),
+          writingsRes.json(),
+          certsRes.json()
+        ]);
+
+        if (projects.success) document.getElementById('projects-count').textContent = projects.data.length;
+        if (writings.success) document.getElementById('writings-count').textContent = writings.data.length;
+        if (certs.success) document.getElementById('certs-count').textContent = certs.data.length;
+
+      } catch (err) {
+        console.error('Failed to load stats', err);
+      }
+    }
+
+    loadStats();
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Service Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+  <div class="container mt-5">
+    <div class="row justify-content-center">
+      <div class="col-md-4">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <h3 class="card-title text-center mb-4">Admin Login</h3>
+            <div id="error-alert" class="alert alert-danger d-none"></div>
+            <form id="login-form">
+              <div class="mb-3">
+                <label>Username</label>
+                <input type="text" id="username" class="form-control" required>
+              </div>
+              <div class="mb-3">
+                <label>Password</label>
+                <input type="password" id="password" class="form-control" required>
+              </div>
+              <button type="submit" class="btn btn-primary w-100">Login</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          localStorage.setItem('token', data.data.token);
+          window.location.href = '/dashboard';
+        } else {
+          document.getElementById('error-alert').textContent = data.error || 'Login failed';
+          document.getElementById('error-alert').classList.remove('d-none');
+        }
+      } catch (err) {
+        document.getElementById('error-alert').textContent = 'An error occurred';
+        document.getElementById('error-alert').classList.remove('d-none');
+      }
+    });
+  </script>
+</body>
+</html>
