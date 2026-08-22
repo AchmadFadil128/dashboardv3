@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
-const { createProxyMiddleware } = require('http-proxy-middleware');
+const path = require('path');
+const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const authRoutes = require('./routes/auth');
@@ -21,13 +22,20 @@ app.set('view engine', 'ejs');
 app.set('views', __dirname + '/views');
 app.use(express.static(__dirname + '/public'));
 
-// Proxy /uploads to SeaweedFS Filer
-const filerUrl = process.env.SEAWEEDFS_FILER_URL || 'http://localhost:8888';
-app.use(createProxyMiddleware({
-  target: filerUrl,
-  changeOrigin: true,
-  pathFilter: '/uploads',
-}));
+// Serve uploaded files from local filesystem
+const uploadsDir = path.resolve(__dirname, '../uploads');
+app.use('/uploads', express.static(uploadsDir));
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const prisma = require('./config/prisma');
+    await prisma.$queryRawUnsafe('SELECT 1');
+    res.json({ status: 'ok', db: 'connected' });
+  } catch {
+    res.status(503).json({ status: 'error', db: 'disconnected' });
+  }
+});
 
 // API Routes
 app.use('/api/auth', authRoutes);
@@ -36,8 +44,25 @@ app.use('/api/writings', writingRoutes);
 app.use('/api/certifications', certificationRoutes);
 app.use('/api/upload', uploadRoutes);
 
-// Admin Panel Routes (EJS) - Simple client-side auth via localStorage
+// Admin Panel Routes (EJS)
 app.get('/login', (req, res) => res.render('login'));
+
+// Protect all /dashboard routes with cookie-based JWT verification
+app.use('/dashboard', (req, res, next) => {
+  const tokenCookie = req.headers.cookie
+    ?.split(';')
+    .map(c => c.trim())
+    .find(c => c.startsWith('token='));
+  const token = tokenCookie ? tokenCookie.substring(6) : null;
+  if (!token) return res.redirect('/login');
+  try {
+    jwt.verify(token, process.env.JWT_SECRET);
+    next();
+  } catch {
+    res.redirect('/login');
+  }
+});
+
 app.get('/dashboard', (req, res) => res.render('dashboard'));
 
 // Projects UI
@@ -61,8 +86,12 @@ app.get('/', (req, res) => {
 });
 
 // 404 Handler
-app.use((req, res, next) => {
-  res.status(404).render('login'); // Just redirect or show a basic error, but since we don't have an error view, redirect to login or dashboard
+app.use((req, res) => {
+  const isApi = req.path.startsWith('/api/');
+  if (isApi) {
+    return res.status(404).json({ success: false, error: 'Not found' });
+  }
+  res.status(404).send('<h1>404 — Page Not Found</h1><p><a href="/dashboard">Go to Dashboard</a></p>');
 });
 
 // Global Error Handler

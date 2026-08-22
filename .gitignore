@@ -15,3 +15,7 @@ build/
 
 # Docker volumes
 data/
+
+# Uploaded files (keep directory via .gitkeep)
+uploads/*
+!uploads/.gitkeep

@@ -1,10 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const axios = require('axios');
-const FormData = require('form-data');
 const path = require('path');
+const fs = require('fs');
 const { authenticateToken } = require('../middleware/auth');
+
+// Upload directory — lives at project root so it can be volume-mounted in Docker
+const UPLOAD_DIR = path.resolve(__dirname, '../../uploads');
+
+// Ensure upload directory exists on startup
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -15,42 +22,30 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    // Prepare filename
+    // Generate unique filename
     const ext = path.extname(req.file.originalname);
     const uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    
-    // Create form data to send to SeaweedFS filer
-    const formData = new FormData();
-    formData.append('file', req.file.buffer, {
-      filename: uniqueFilename,
-      contentType: req.file.mimetype,
-    });
+    const filePath = path.join(UPLOAD_DIR, uniqueFilename);
 
-    // Upload to SeaweedFS filer (internal container URL)
-    const filerUrl = process.env.SEAWEEDFS_FILER_URL || 'http://localhost:8888';
-    const uploadUrl = `${filerUrl}/uploads/${uniqueFilename}`;
+    // Write file to local disk
+    await fs.promises.writeFile(filePath, req.file.buffer);
 
-    const response = await axios.post(uploadUrl, formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
-    });
-
-    // Return public-facing URL so the file is accessible from the browser
+    // Return public-facing URL
     const publicUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 4000}`;
-    const fileUrl = `${publicUrl}/uploads/${uniqueFilename}`;
+    const url = `${publicUrl}/uploads/${uniqueFilename}`;
 
     res.json({
       success: true,
       data: {
-        url: fileUrl,
-        filename: uniqueFilename
+        fileId: uniqueFilename,
+        fileName: uniqueFilename,
+        url: url,
+        size: req.file.size
       }
     });
-
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ success: false, error: 'Failed to upload file to SeaweedFS' });
+    res.status(500).json({ success: false, error: 'Failed to upload file' });
   }
 });
 

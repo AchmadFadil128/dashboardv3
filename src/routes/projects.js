@@ -14,6 +14,7 @@ const projectSchema = z.object({
   status: z.string().optional(),
   otherPictures: z.any().optional(), // Array or JSON string
   techStack: z.any().optional(), // Array or JSON string
+  exturlproject: z.string().optional(),
 });
 
 const formatJsonField = (field) => {
@@ -72,7 +73,8 @@ router.post('/', async (req, res) => {
         dateCreate: validatedData.dateCreate ? new Date(validatedData.dateCreate) : new Date(),
         status: validatedData.status || 'Planned',
         otherPictures: formatJsonField(validatedData.otherPictures),
-        techStack: formatJsonField(validatedData.techStack)
+        techStack: formatJsonField(validatedData.techStack),
+        exturlproject: validatedData.exturlproject || ''
       }
     });
 

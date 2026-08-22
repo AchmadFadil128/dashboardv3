@@ -18,6 +18,7 @@ model Project {
   status           String   @default("Planned") @map("status") @db.VarChar(50)
   otherPictures    Json     @default("[]") @map("other_pictures")
   techStack        Json     @default("[]") @map("tech_stack")
+  exturlproject    String   @default("") @map("ext_url_project")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz()
 
@@ -38,13 +39,14 @@ model Writing {
 }
 
 model Certification {
-  id         String   @id @default(uuid()) @db.Uuid
-  name       String   @db.VarChar(255)
-  status     String   @default("Active") @db.VarChar(50)
-  pictureUrl String   @default("") @map("picture_url")
-  issuer     String   @default("") @db.VarChar(255)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+  id             String    @id @default(uuid()) @db.Uuid
+  name           String    @db.VarChar(255)
+  status         String    @default("Active") @db.VarChar(50)
+  pictureUrl     String    @default("") @map("picture_url")
+  issuer         String    @default("") @db.VarChar(255)
+  expirationDate DateTime? @map("expiration_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz()
 
   @@map("certifications")
 }

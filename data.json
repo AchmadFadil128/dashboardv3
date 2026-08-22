@@ -1,0 +1,121 @@
+{
+  "types": {
+    "ProjectStatus": [
+      "Planned",
+      "In Progress",
+      "On Hold",
+      "Completed",
+      "Cancelled"
+    ],
+    "WritingStatus": [
+      "Planned",
+      "In Progress",
+      "On Hold",
+      "Completed",
+      "Published"
+    ],
+    "CertificationStatus": [
+      "Active",
+      "Near Expiry",
+      "Expired"
+    ]
+  },
+
+  "models": {
+    "Project": {
+      "id": "string",
+      "name": "string",
+      "pictureUrl": "string",
+      "shortDescription": "string",
+      "dateCreate": "string (ISO date)",
+      "status": "ProjectStatus",
+      "longDescription": "string",
+      "otherPictures": ["string"],
+      "techStack": ["string"],
+      "exturlproject": "string (optional)"
+    },
+
+    "Writing": {
+      "id": "string",
+      "name": "string",
+      "shortDescription": "string",
+      "dateCreate": "string (ISO date)",
+      "status": "WritingStatus",
+      "urlFile": "string"
+    },
+
+    "Certification": {
+      "id": "string",
+      "name": "string",
+      "status": "CertificationStatus",
+      "pictureUrl": "string",
+      "issuer": "string",
+      "expirationDate": "string (ISO date)"
+    },
+
+    "Education": {
+      "degree": "string",
+      "field": "string",
+      "institution": "string",
+      "year": "string"
+    },
+
+    "CareerEntry": {
+      "role": "string",
+      "company": "string",
+      "period": "string",
+      "description": "string"
+    },
+
+    "People": {
+      "name": "string",
+      "title": "string",
+      "description": "string",
+      "workingAt": "string",
+      "skills": ["string"],
+      "education": ["Education"],
+      "carrierPath": ["CareerEntry"],
+      "contact": {
+        "email": "string",
+        "github": "string",
+        "linkedin": "string",
+        "twitter": "string"
+      },
+      "hobbies": ["string"]
+    }
+  },
+
+  "api": {
+    "baseUrl": "process.env.API_BASE_URL || http://localhost:4000",
+    "method": "GET",
+    "responseFormat": {
+      "data": "T"
+    },
+    "cache": {
+      "nextRevalidate": 60
+    }
+  },
+
+  "dataLayer": {
+    "peopleSource": "static",
+    "projectsSource": ["api", "fallback-dummy"],
+    "writingsSource": ["api", "fallback-dummy"],
+    "certificationsSource": ["api", "fallback-dummy"]
+  },
+
+  "fallbackData": {
+    "people": "People object (static)",
+    "projects": "Project[] static data",
+    "writings": "Writing[] static data",
+    "certifications": "Certification[] static data"
+  },
+
+  "serviceLayer": {
+    "getPeople": "return static people",
+    "getProjects": "try API /api/projects then fallback",
+    "getProjectById": "try API /api/projects/:id then undefined",
+    "getWritings": "try API /api/writings then fallback",
+    "getWritingById": "try API /api/writings/:id then undefined",
+    "getCertifications": "try API /api/certifications then fallback"
+  }
+}
