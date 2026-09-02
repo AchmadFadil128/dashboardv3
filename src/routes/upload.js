@@ -22,13 +22,29 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
       return res.status(400).json({ success: false, error: 'No file uploaded' });
     }
 
-    // Generate unique filename
-    const ext = path.extname(req.file.originalname);
-    const uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-    const filePath = path.join(UPLOAD_DIR, uniqueFilename);
+    const isImage = req.file.mimetype.startsWith('image/');
+    let ext = path.extname(req.file.originalname);
+    let finalBuffer = req.file.buffer;
+    let size = req.file.size;
+    let uniqueFilename = '';
 
-    // Write file to local disk
-    await fs.promises.writeFile(filePath, req.file.buffer);
+    if (isImage) {
+      ext = '.webp';
+      uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const filePath = path.join(UPLOAD_DIR, uniqueFilename);
+
+      const image = new Bun.Image(req.file.buffer);
+      await image.webp({ quality: 80 }).write(filePath);
+
+      const stats = await fs.promises.stat(filePath);
+      size = stats.size;
+    } else {
+      uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+      const filePath = path.join(UPLOAD_DIR, uniqueFilename);
+
+      // Write file to local disk
+      await fs.promises.writeFile(filePath, finalBuffer);
+    }
 
     // Return public-facing URL
     const publicUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 4000}`;
@@ -40,7 +56,7 @@ router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
         fileId: uniqueFilename,
         fileName: uniqueFilename,
         url: url,
-        size: req.file.size
+        size: size
       }
     });
   } catch (error) {

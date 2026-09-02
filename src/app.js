@@ -9,10 +9,13 @@ const projectRoutes = require('./routes/projects');
 const writingRoutes = require('./routes/writings');
 const certificationRoutes = require('./routes/certifications');
 const uploadRoutes = require('./routes/upload');
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocument = require('./swagger.json');
 
 const app = express();
 
 // Middleware
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

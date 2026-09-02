@@ -1,0 +1,268 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Dashboard API",
+    "description": "API documentation for the dashboard."
+  },
+  "basePath": "/",
+  "securityDefinitions": {
+    "Bearer": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header"
+    }
+  },
+  "paths": {
+    "/api/auth/login": {
+      "post": {
+        "summary": "Admin Login",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "username": { "type": "string" },
+                "password": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Successful login" }
+        }
+      }
+    },
+    "/api/projects": {
+      "get": {
+        "summary": "Get all projects",
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      },
+      "post": {
+        "summary": "Create a new project",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/api/projects/{id}": {
+      "get": {
+        "summary": "Get a project by ID",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      },
+      "put": {
+        "summary": "Update a project by ID",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Updated" }
+        }
+      },
+      "delete": {
+        "summary": "Delete a project by ID",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Deleted" }
+        }
+      }
+    },
+    "/api/writings": {
+      "get": {
+        "summary": "Get all writings",
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      },
+      "post": {
+        "summary": "Create a new writing",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/api/writings/{id}": {
+      "get": {
+        "summary": "Get a writing by ID",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      },
+      "put": {
+        "summary": "Update a writing by ID",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Updated" }
+        }
+      },
+      "delete": {
+        "summary": "Delete a writing by ID",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Deleted" }
+        }
+      }
+    },
+    "/api/certifications": {
+      "get": {
+        "summary": "Get all certifications",
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      },
+      "post": {
+        "summary": "Create a new certification",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": { "description": "Created" }
+        }
+      }
+    },
+    "/api/certifications/{id}": {
+      "get": {
+        "summary": "Get a certification by ID",
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Success" }
+        }
+      },
+      "put": {
+        "summary": "Update a certification by ID",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Updated" }
+        }
+      },
+      "delete": {
+        "summary": "Delete a certification by ID",
+        "security": [{ "Bearer": [] }],
+        "parameters": [
+          { "in": "path", "name": "id", "required": true, "type": "string" }
+        ],
+        "responses": {
+          "200": { "description": "Deleted" }
+        }
+      }
+    },
+    "/api/upload": {
+      "post": {
+        "summary": "Upload a file",
+        "security": [{ "Bearer": [] }],
+        "consumes": ["multipart/form-data"],
+        "parameters": [
+          {
+            "in": "formData",
+            "name": "file",
+            "type": "file",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": { "description": "Uploaded" }
+        }
+      }
+    }
+  }
+}
