@@ -1,18 +1,13 @@
 const { describe, expect, it, mock } = require('bun:test');
-const request = require('supertest');
-const express = require('express');
-const authRoutes = require('../routes/auth');
 const { prismaMock } = require('./setup');
-const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-const app = express();
-app.use(express.json());
-app.use('/api/auth', authRoutes);
+const authHandler = require('../routes/auth');
 
 describe('Auth API', () => {
   it('should login successfully', async () => {
     const password = 'password123';
-    const hash = await bcrypt.hash(password, 10);
+    const hash = await Bun.password.hash(password);
 
     prismaMock.adminUser.findUnique.mockResolvedValueOnce({
       id: '1',
@@ -20,17 +15,22 @@ describe('Auth API', () => {
       passwordHash: hash
     });
 
-    const response = await request(app)
-      .post('/api/auth/login')
-      .send({ username: 'admin', password });
+    const req = new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'admin', password }),
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const response = await authHandler(req, new URL(req.url));
+    const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
-    expect(response.body.data.token).toBeDefined();
+    expect(data.success).toBe(true);
+    expect(data.data.token).toBeDefined();
   });
 
   it('should fail with invalid password', async () => {
-    const hash = await bcrypt.hash('password123', 10);
+    const hash = await Bun.password.hash('password123');
 
     prismaMock.adminUser.findUnique.mockResolvedValueOnce({
       id: '1',
@@ -38,11 +38,16 @@ describe('Auth API', () => {
       passwordHash: hash
     });
 
-    const response = await request(app)
-      .post('/api/auth/login')
-      .send({ username: 'admin', password: 'wrongpassword' });
+    const req = new Request('http://localhost/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ username: 'admin', password: 'wrongpassword' }),
+      headers: { 'Content-Type': 'application/json' }
+    });
+
+    const response = await authHandler(req, new URL(req.url));
+    const data = await response.json();
 
     expect(response.status).toBe(401);
-    expect(response.body.success).toBe(false);
+    expect(data.success).toBe(false);
   });
 });

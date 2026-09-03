@@ -1,8 +1,6 @@
-const express = require('express');
-const router = express.Router();
 const { z } = require('zod');
 const prisma = require('../config/prisma');
-const { authenticateToken } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const { normalizeItem, normalizeList } = require('../utils/normalizeUrl');
 
 const projectSchema = z.object({
@@ -10,10 +8,10 @@ const projectSchema = z.object({
   pictureUrl: z.string().optional(),
   shortDescription: z.string().optional(),
   longDescription: z.string().optional(),
-  dateCreate: z.string().optional(), // Expected format: YYYY-MM-DD
+  dateCreate: z.string().optional(),
   status: z.string().optional(),
-  otherPictures: z.any().optional(), // Array or JSON string
-  techStack: z.any().optional(), // Array or JSON string
+  otherPictures: z.any().optional(),
+  techStack: z.any().optional(),
   exturlproject: z.string().optional(),
 });
 
@@ -29,111 +27,123 @@ const formatJsonField = (field) => {
   return field;
 };
 
-// Public GET routes
-router.get('/', async (req, res) => {
-  try {
-    const projects = await prisma.project.findMany({
-      orderBy: { dateCreate: 'desc' }
-    });
-    res.json({ success: true, data: normalizeList(projects, ['pictureUrl']) });
-  } catch (error) {
-    console.error('Fetch projects error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+module.exports = async (req, url) => {
+  const path = url.pathname;
 
-router.get('/:id', async (req, res) => {
-  try {
-    const project = await prisma.project.findUnique({
-      where: { id: req.params.id }
-    });
-    if (!project) {
-      return res.status(404).json({ success: false, error: 'Project not found' });
+  if (req.method === 'GET' && path === '/api/projects') {
+    try {
+      const projects = await prisma.project.findMany({
+        orderBy: { dateCreate: 'desc' }
+      });
+      return Response.json({ success: true, data: normalizeList(projects, ['pictureUrl']) });
+    } catch (error) {
+      console.error('Fetch projects error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    res.json({ success: true, data: normalizeItem(project, ['pictureUrl']) });
-  } catch (error) {
-    console.error('Fetch project error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-// Protected routes
-router.use(authenticateToken);
-
-router.post('/', async (req, res) => {
-  try {
-    const validatedData = projectSchema.parse(req.body);
-    
-    const project = await prisma.project.create({
-      data: {
-        name: validatedData.name,
-        pictureUrl: validatedData.pictureUrl || '',
-        shortDescription: validatedData.shortDescription || '',
-        longDescription: validatedData.longDescription || '',
-        dateCreate: validatedData.dateCreate ? new Date(validatedData.dateCreate) : new Date(),
-        status: validatedData.status || 'Planned',
-        otherPictures: formatJsonField(validatedData.otherPictures),
-        techStack: formatJsonField(validatedData.techStack),
-        exturlproject: validatedData.exturlproject || ''
+  const matchId = path.match(/^\/api\/projects\/([^\/]+)$/);
+  if (req.method === 'GET' && matchId) {
+    try {
+      const project = await prisma.project.findUnique({
+        where: { id: matchId[1] }
+      });
+      if (!project) {
+        return Response.json({ success: false, error: 'Project not found' }, { status: 404 });
       }
-    });
-
-    res.status(201).json({ success: true, data: normalizeItem(project, ['pictureUrl']) });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: error.errors });
+      return Response.json({ success: true, data: normalizeItem(project, ['pictureUrl']) });
+    } catch (error) {
+      console.error('Fetch project error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    console.error('Create project error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-router.put('/:id', async (req, res) => {
+  // Auth needed for write ops
   try {
-    const validatedData = projectSchema.partial().parse(req.body);
-    
-    const updateData = { ...validatedData };
-    if (updateData.dateCreate) {
-      updateData.dateCreate = new Date(updateData.dateCreate);
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      requireAuth(req);
     }
-    if (updateData.otherPictures !== undefined) {
-      updateData.otherPictures = formatJsonField(updateData.otherPictures);
-    }
-    if (updateData.techStack !== undefined) {
-      updateData.techStack = formatJsonField(updateData.techStack);
-    }
-
-    const project = await prisma.project.update({
-      where: { id: req.params.id },
-      data: updateData
-    });
-
-    res.json({ success: true, data: normalizeItem(project, ['pictureUrl']) });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: error.errors });
-    }
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, error: 'Project not found' });
-    }
-    console.error('Update project error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: err.message.includes('Unauthorized') ? 401 : 403 });
   }
-});
 
-router.delete('/:id', async (req, res) => {
-  try {
-    await prisma.project.delete({
-      where: { id: req.params.id }
-    });
-    res.json({ success: true, data: null });
-  } catch (error) {
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, error: 'Project not found' });
+  if (req.method === 'POST' && path === '/api/projects') {
+    try {
+      const body = await req.json();
+      const validatedData = projectSchema.parse(body);
+
+      const project = await prisma.project.create({
+        data: {
+          name: validatedData.name,
+          pictureUrl: validatedData.pictureUrl || '',
+          shortDescription: validatedData.shortDescription || '',
+          longDescription: validatedData.longDescription || '',
+          dateCreate: validatedData.dateCreate ? new Date(validatedData.dateCreate) : new Date(),
+          status: validatedData.status || 'Planned',
+          otherPictures: formatJsonField(validatedData.otherPictures),
+          techStack: formatJsonField(validatedData.techStack),
+          exturlproject: validatedData.exturlproject || ''
+        }
+      });
+
+      return Response.json({ success: true, data: normalizeItem(project, ['pictureUrl']) }, { status: 201 });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return Response.json({ success: false, error: error.errors }, { status: 400 });
+      }
+      console.error('Create project error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    console.error('Delete project error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-module.exports = router;
+  if (req.method === 'PUT' && matchId) {
+    try {
+      const body = await req.json();
+      const validatedData = projectSchema.partial().parse(body);
+
+      const updateData = { ...validatedData };
+      if (updateData.dateCreate) {
+        updateData.dateCreate = new Date(updateData.dateCreate);
+      }
+      if (updateData.otherPictures !== undefined) {
+        updateData.otherPictures = formatJsonField(updateData.otherPictures);
+      }
+      if (updateData.techStack !== undefined) {
+        updateData.techStack = formatJsonField(updateData.techStack);
+      }
+
+      const project = await prisma.project.update({
+        where: { id: matchId[1] },
+        data: updateData
+      });
+
+      return Response.json({ success: true, data: normalizeItem(project, ['pictureUrl']) });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return Response.json({ success: false, error: error.errors }, { status: 400 });
+      }
+      if (error.code === 'P2025') {
+        return Response.json({ success: false, error: 'Project not found' }, { status: 404 });
+      }
+      console.error('Update project error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    }
+  }
+
+  if (req.method === 'DELETE' && matchId) {
+    try {
+      await prisma.project.delete({
+        where: { id: matchId[1] }
+      });
+      return Response.json({ success: true, data: null });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        return Response.json({ success: false, error: 'Project not found' }, { status: 404 });
+      }
+      console.error('Delete project error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    }
+  }
+
+  return Response.json({ success: false, error: 'Not found' }, { status: 404 });
+};

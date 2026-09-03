@@ -3,7 +3,6 @@ FROM oven/bun:alpine AS builder
 WORKDIR /app
 
 COPY package*.json bun.lock* ./
-# Install semua deps (termasuk dev) agar prisma CLI & generate bisa jalan
 RUN bun install
 
 COPY prisma ./prisma/

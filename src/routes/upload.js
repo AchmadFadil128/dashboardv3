@@ -1,68 +1,70 @@
-const express = require('express');
-const router = express.Router();
-const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const { authenticateToken } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 
-// Upload directory — lives at project root so it can be volume-mounted in Docker
 const UPLOAD_DIR = path.resolve(__dirname, '../../uploads');
 
-// Ensure upload directory exists on startup
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-
-router.post('/', authenticateToken, upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: 'No file uploaded' });
-    }
-
-    const isImage = req.file.mimetype.startsWith('image/');
-    let ext = path.extname(req.file.originalname);
-    let finalBuffer = req.file.buffer;
-    let size = req.file.size;
-    let uniqueFilename = '';
-
-    if (isImage) {
-      ext = '.webp';
-      uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-      const filePath = path.join(UPLOAD_DIR, uniqueFilename);
-
-      const image = new Bun.Image(req.file.buffer);
-      await image.webp({ quality: 80 }).write(filePath);
-
-      const stats = await fs.promises.stat(filePath);
-      size = stats.size;
-    } else {
-      uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
-      const filePath = path.join(UPLOAD_DIR, uniqueFilename);
-
-      // Write file to local disk
-      await fs.promises.writeFile(filePath, finalBuffer);
-    }
-
-    // Return public-facing URL
-    const publicUrl = process.env.PUBLIC_URL || `http://localhost:${process.env.PORT || 4000}`;
-    const url = `${publicUrl}/uploads/${uniqueFilename}`;
-
-    res.json({
-      success: true,
-      data: {
-        fileId: uniqueFilename,
-        fileName: uniqueFilename,
-        url: url,
-        size: size
+module.exports = async (req, url) => {
+  if (req.method === 'POST' && url.pathname === '/api/upload') {
+    try {
+      // Require Authentication
+      try {
+        requireAuth(req);
+      } catch (err) {
+        return Response.json({ success: false, error: err.message }, { status: err.message.includes('Unauthorized') ? 401 : 403 });
       }
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ success: false, error: 'Failed to upload file' });
-  }
-});
 
-module.exports = router;
+      const form = await req.formData();
+      const file = form.get('file');
+
+      if (!file || !(file instanceof File)) {
+        return Response.json({ success: false, error: 'No file uploaded' }, { status: 400 });
+      }
+
+      const isImage = file.type.startsWith('image/');
+      let ext = path.extname(file.name);
+      let size = file.size;
+      let uniqueFilename = '';
+
+      if (isImage) {
+        ext = '.webp';
+        uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const filePath = path.join(UPLOAD_DIR, uniqueFilename);
+
+        const arrayBuffer = await file.arrayBuffer();
+        const image = new Bun.Image(arrayBuffer);
+        await image.webp({ quality: 80 }).write(filePath);
+
+        const stats = await fs.promises.stat(filePath);
+        size = stats.size;
+      } else {
+        uniqueFilename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+        const filePath = path.join(UPLOAD_DIR, uniqueFilename);
+
+        await Bun.write(filePath, file);
+      }
+
+      const publicUrl = Bun.env.PUBLIC_URL || `http://localhost:${Bun.env.PORT || 4000}`;
+      const returnUrl = `${publicUrl}/uploads/${uniqueFilename}`;
+
+      return Response.json({
+        success: true,
+        data: {
+          fileId: uniqueFilename,
+          fileName: uniqueFilename,
+          url: returnUrl,
+          size: size
+        }
+      });
+    } catch (error) {
+      console.error('Upload error:', error);
+      return Response.json({ success: false, error: 'Failed to upload file' }, { status: 500 });
+    }
+  }
+
+  return Response.json({ success: false, error: 'Not found' }, { status: 404 });
+};

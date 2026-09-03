@@ -31,8 +31,7 @@ mock.module('../config/prisma', () => {
   return prismaMock;
 });
 
-// Since the auth middleware uses jwt directly we will not mock jwt, but we will provide an env var for it.
-process.env.JWT_SECRET = 'test_secret';
-process.env.PORT = 4001; // Avoid port clash
+Bun.env.JWT_SECRET = 'test_secret';
+Bun.env.PORT = '4001';
 
 module.exports = { prismaMock };

@@ -1,8 +1,6 @@
-const express = require('express');
-const router = express.Router();
 const { z } = require('zod');
 const prisma = require('../config/prisma');
-const { authenticateToken } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const { normalizeItem, normalizeList } = require('../utils/normalizeUrl');
 
 const writingSchema = z.object({
@@ -13,101 +11,112 @@ const writingSchema = z.object({
   urlFile: z.string().optional(),
 });
 
-// Public GET routes
-router.get('/', async (req, res) => {
-  try {
-    const writings = await prisma.writing.findMany({
-      orderBy: { dateCreate: 'desc' }
-    });
-    res.json({ success: true, data: normalizeList(writings, ['urlFile']) });
-  } catch (error) {
-    console.error('Fetch writings error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+module.exports = async (req, url) => {
+  const path = url.pathname;
 
-router.get('/:id', async (req, res) => {
-  try {
-    const writing = await prisma.writing.findUnique({
-      where: { id: req.params.id }
-    });
-    if (!writing) {
-      return res.status(404).json({ success: false, error: 'Writing not found' });
+  if (req.method === 'GET' && path === '/api/writings') {
+    try {
+      const writings = await prisma.writing.findMany({
+        orderBy: { dateCreate: 'desc' }
+      });
+      return Response.json({ success: true, data: normalizeList(writings, ['urlFile']) });
+    } catch (error) {
+      console.error('Fetch writings error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    res.json({ success: true, data: normalizeItem(writing, ['urlFile']) });
-  } catch (error) {
-    console.error('Fetch writing error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-// Protected routes
-router.use(authenticateToken);
-
-router.post('/', async (req, res) => {
-  try {
-    const validatedData = writingSchema.parse(req.body);
-    
-    const writing = await prisma.writing.create({
-      data: {
-        name: validatedData.name,
-        shortDescription: validatedData.shortDescription || '',
-        dateCreate: validatedData.dateCreate ? new Date(validatedData.dateCreate) : new Date(),
-        status: validatedData.status || 'Draft',
-        urlFile: validatedData.urlFile || ''
+  const matchId = path.match(/^\/api\/writings\/([^\/]+)$/);
+  if (req.method === 'GET' && matchId) {
+    try {
+      const writing = await prisma.writing.findUnique({
+        where: { id: matchId[1] }
+      });
+      if (!writing) {
+        return Response.json({ success: false, error: 'Writing not found' }, { status: 404 });
       }
-    });
-
-    res.status(201).json({ success: true, data: normalizeItem(writing, ['urlFile']) });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: error.errors });
+      return Response.json({ success: true, data: normalizeItem(writing, ['urlFile']) });
+    } catch (error) {
+      console.error('Fetch writing error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    console.error('Create writing error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-router.put('/:id', async (req, res) => {
   try {
-    const validatedData = writingSchema.partial().parse(req.body);
-    
-    const updateData = { ...validatedData };
-    if (updateData.dateCreate) {
-      updateData.dateCreate = new Date(updateData.dateCreate);
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      requireAuth(req);
     }
-
-    const writing = await prisma.writing.update({
-      where: { id: req.params.id },
-      data: updateData
-    });
-
-    res.json({ success: true, data: normalizeItem(writing, ['urlFile']) });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: error.errors });
-    }
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, error: 'Writing not found' });
-    }
-    console.error('Update writing error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: err.message.includes('Unauthorized') ? 401 : 403 });
   }
-});
 
-router.delete('/:id', async (req, res) => {
-  try {
-    await prisma.writing.delete({
-      where: { id: req.params.id }
-    });
-    res.json({ success: true, data: null });
-  } catch (error) {
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, error: 'Writing not found' });
+  if (req.method === 'POST' && path === '/api/writings') {
+    try {
+      const body = await req.json();
+      const validatedData = writingSchema.parse(body);
+
+      const writing = await prisma.writing.create({
+        data: {
+          name: validatedData.name,
+          shortDescription: validatedData.shortDescription || '',
+          dateCreate: validatedData.dateCreate ? new Date(validatedData.dateCreate) : new Date(),
+          status: validatedData.status || 'Draft',
+          urlFile: validatedData.urlFile || ''
+        }
+      });
+
+      return Response.json({ success: true, data: normalizeItem(writing, ['urlFile']) }, { status: 201 });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return Response.json({ success: false, error: error.errors }, { status: 400 });
+      }
+      console.error('Create writing error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    console.error('Delete writing error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-module.exports = router;
+  if (req.method === 'PUT' && matchId) {
+    try {
+      const body = await req.json();
+      const validatedData = writingSchema.partial().parse(body);
+
+      const updateData = { ...validatedData };
+      if (updateData.dateCreate) {
+        updateData.dateCreate = new Date(updateData.dateCreate);
+      }
+
+      const writing = await prisma.writing.update({
+        where: { id: matchId[1] },
+        data: updateData
+      });
+
+      return Response.json({ success: true, data: normalizeItem(writing, ['urlFile']) });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return Response.json({ success: false, error: error.errors }, { status: 400 });
+      }
+      if (error.code === 'P2025') {
+        return Response.json({ success: false, error: 'Writing not found' }, { status: 404 });
+      }
+      console.error('Update writing error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    }
+  }
+
+  if (req.method === 'DELETE' && matchId) {
+    try {
+      await prisma.writing.delete({
+        where: { id: matchId[1] }
+      });
+      return Response.json({ success: true, data: null });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        return Response.json({ success: false, error: 'Writing not found' }, { status: 404 });
+      }
+      console.error('Delete writing error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    }
+  }
+
+  return Response.json({ success: false, error: 'Not found' }, { status: 404 });
+};
