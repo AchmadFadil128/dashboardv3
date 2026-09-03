@@ -1,46 +1,47 @@
-const express = require('express');
-const router = express.Router();
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const { z } = require('zod');
 const prisma = require('../config/prisma');
+const jwt = require('jsonwebtoken');
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),
   password: z.string().min(1, 'Password is required')
 });
 
-router.post('/login', async (req, res) => {
-  try {
-    const validatedData = loginSchema.parse(req.body);
-    const user = await prisma.adminUser.findUnique({
-      where: { username: validatedData.username }
-    });
+module.exports = async (req, url) => {
+  if (req.method === 'POST' && url.pathname === '/api/auth/login') {
+    try {
+      const body = await req.json();
+      const validatedData = loginSchema.parse(body);
 
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Invalid username or password' });
+      const user = await prisma.adminUser.findUnique({
+        where: { username: validatedData.username }
+      });
+
+      if (!user) {
+        return Response.json({ success: false, error: 'Invalid username or password' }, { status: 401 });
+      }
+
+      const isValidPassword = await Bun.password.verify(validatedData.password, user.passwordHash);
+
+      if (!isValidPassword) {
+        return Response.json({ success: false, error: 'Invalid username or password' }, { status: 401 });
+      }
+
+      const token = jwt.sign(
+        { userId: user.id, username: user.username },
+        Bun.env.JWT_SECRET,
+        { expiresIn: Bun.env.JWT_EXPIRES_IN || '7d' }
+      );
+
+      return Response.json({ success: true, data: { token } });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return Response.json({ success: false, error: error.errors[0].message }, { status: 400 });
+      }
+      console.error('Login error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-
-    const isValidPassword = await bcrypt.compare(validatedData.password, user.passwordHash);
-    
-    if (!isValidPassword) {
-      return res.status(401).json({ success: false, error: 'Invalid username or password' });
-    }
-
-    const token = jwt.sign(
-      { userId: user.id, username: user.username },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
-
-    res.json({ success: true, data: { token } });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: error.errors[0].message });
-    }
-    console.error('Login error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-module.exports = router;
+  return Response.json({ success: false, error: 'Not found' }, { status: 404 });
+};

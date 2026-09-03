@@ -1,8 +1,6 @@
-const express = require('express');
-const router = express.Router();
 const { z } = require('zod');
 const prisma = require('../config/prisma');
-const { authenticateToken } = require('../middleware/auth');
+const { requireAuth } = require('../middleware/auth');
 const { normalizeItem, normalizeList } = require('../utils/normalizeUrl');
 
 const certificationSchema = z.object({
@@ -12,95 +10,106 @@ const certificationSchema = z.object({
   issuer: z.string().optional(),
 });
 
-// Public GET routes
-router.get('/', async (req, res) => {
-  try {
-    const certifications = await prisma.certification.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
-    res.json({ success: true, data: normalizeList(certifications, ['pictureUrl']) });
-  } catch (error) {
-    console.error('Fetch certifications error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
-  }
-});
+module.exports = async (req, url) => {
+  const path = url.pathname;
 
-router.get('/:id', async (req, res) => {
-  try {
-    const certification = await prisma.certification.findUnique({
-      where: { id: req.params.id }
-    });
-    if (!certification) {
-      return res.status(404).json({ success: false, error: 'Certification not found' });
+  if (req.method === 'GET' && path === '/api/certifications') {
+    try {
+      const certifications = await prisma.certification.findMany({
+        orderBy: { createdAt: 'desc' }
+      });
+      return Response.json({ success: true, data: normalizeList(certifications, ['pictureUrl']) });
+    } catch (error) {
+      console.error('Fetch certifications error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    res.json({ success: true, data: normalizeItem(certification, ['pictureUrl']) });
-  } catch (error) {
-    console.error('Fetch certification error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-// Protected routes
-router.use(authenticateToken);
-
-router.post('/', async (req, res) => {
-  try {
-    const validatedData = certificationSchema.parse(req.body);
-    
-    const certification = await prisma.certification.create({
-      data: {
-        name: validatedData.name,
-        status: validatedData.status || 'Active',
-        pictureUrl: validatedData.pictureUrl || '',
-        issuer: validatedData.issuer || ''
+  const matchId = path.match(/^\/api\/certifications\/([^\/]+)$/);
+  if (req.method === 'GET' && matchId) {
+    try {
+      const certification = await prisma.certification.findUnique({
+        where: { id: matchId[1] }
+      });
+      if (!certification) {
+        return Response.json({ success: false, error: 'Certification not found' }, { status: 404 });
       }
-    });
-
-    res.status(201).json({ success: true, data: normalizeItem(certification, ['pictureUrl']) });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: error.errors });
+      return Response.json({ success: true, data: normalizeItem(certification, ['pictureUrl']) });
+    } catch (error) {
+      console.error('Fetch certification error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    console.error('Create certification error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-router.put('/:id', async (req, res) => {
   try {
-    const validatedData = certificationSchema.partial().parse(req.body);
-
-    const certification = await prisma.certification.update({
-      where: { id: req.params.id },
-      data: validatedData
-    });
-
-    res.json({ success: true, data: normalizeItem(certification, ['pictureUrl']) });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ success: false, error: error.errors });
+    if (['POST', 'PUT', 'DELETE'].includes(req.method)) {
+      requireAuth(req);
     }
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, error: 'Certification not found' });
-    }
-    console.error('Update certification error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
+  } catch (err) {
+    return Response.json({ success: false, error: err.message }, { status: err.message.includes('Unauthorized') ? 401 : 403 });
   }
-});
 
-router.delete('/:id', async (req, res) => {
-  try {
-    await prisma.certification.delete({
-      where: { id: req.params.id }
-    });
-    res.json({ success: true, data: null });
-  } catch (error) {
-    if (error.code === 'P2025') {
-      return res.status(404).json({ success: false, error: 'Certification not found' });
+  if (req.method === 'POST' && path === '/api/certifications') {
+    try {
+      const body = await req.json();
+      const validatedData = certificationSchema.parse(body);
+
+      const certification = await prisma.certification.create({
+        data: {
+          name: validatedData.name,
+          status: validatedData.status || 'Active',
+          pictureUrl: validatedData.pictureUrl || '',
+          issuer: validatedData.issuer || ''
+        }
+      });
+
+      return Response.json({ success: true, data: normalizeItem(certification, ['pictureUrl']) }, { status: 201 });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return Response.json({ success: false, error: error.errors }, { status: 400 });
+      }
+      console.error('Create certification error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
     }
-    console.error('Delete certification error:', error);
-    res.status(500).json({ success: false, error: 'Internal server error' });
   }
-});
 
-module.exports = router;
+  if (req.method === 'PUT' && matchId) {
+    try {
+      const body = await req.json();
+      const validatedData = certificationSchema.partial().parse(body);
+
+      const certification = await prisma.certification.update({
+        where: { id: matchId[1] },
+        data: validatedData
+      });
+
+      return Response.json({ success: true, data: normalizeItem(certification, ['pictureUrl']) });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return Response.json({ success: false, error: error.errors }, { status: 400 });
+      }
+      if (error.code === 'P2025') {
+        return Response.json({ success: false, error: 'Certification not found' }, { status: 404 });
+      }
+      console.error('Update certification error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    }
+  }
+
+  if (req.method === 'DELETE' && matchId) {
+    try {
+      await prisma.certification.delete({
+        where: { id: matchId[1] }
+      });
+      return Response.json({ success: true, data: null });
+    } catch (error) {
+      if (error.code === 'P2025') {
+        return Response.json({ success: false, error: 'Certification not found' }, { status: 404 });
+      }
+      console.error('Delete certification error:', error);
+      return Response.json({ success: false, error: 'Internal server error' }, { status: 500 });
+    }
+  }
+
+  return Response.json({ success: false, error: 'Not found' }, { status: 404 });
+};

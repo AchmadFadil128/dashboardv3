@@ -5,10 +5,10 @@ echo "[entrypoint] Ensuring uploads directory exists..."
 mkdir -p /app/uploads
 
 echo "[entrypoint] Syncing database schema..."
-npx prisma db push
+bunx prisma db push
 
 echo "[entrypoint] Running seed (idempotent)..."
-node prisma/seed.js
+bun prisma/seed.js
 
 echo "[entrypoint] Starting server..."
-exec node src/app.js
+exec bun src/app.js

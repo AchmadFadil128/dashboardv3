@@ -1,15 +1,14 @@
-FROM node:20-alpine AS builder
+FROM oven/bun:alpine AS builder
 
 WORKDIR /app
 
-COPY package*.json ./
-# Install semua deps (termasuk dev) agar prisma CLI & generate bisa jalan
-RUN npm ci
+COPY package*.json bun.lock* ./
+RUN bun install
 
 COPY prisma ./prisma/
-RUN npx prisma generate
+RUN bunx prisma generate
 
-FROM node:20-alpine
+FROM oven/bun:alpine
 
 RUN apk add --no-cache openssl libssl3
 
